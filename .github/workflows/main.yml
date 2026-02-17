@@ -1,0 +1,47 @@
+name: macOS-Tailscale-VNC ✨
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Download & Install Tailscale
+        run: |
+          curl -L -O https://pkgs.tailscale.com/stable/Tailscale-latest-macos.pkg
+          sudo installer -pkg Tailscale-latest-macos.pkg -target /
+          
+      - name: Start & Authenticate Tailscale
+        run: |
+          # Start the Tailscale daemon in the background
+          sudo /Applications/Tailscale.app/Contents/MacOS/Tailscaled &
+          sleep 5
+          # Bring the node online using your Auth Key
+          sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --accept-routes
+          
+      - name: Enable Screen Sharing (VNC)
+        run: |
+          # Kickstart the built-in Apple Remote Desktop / VNC server
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -restart -agent -privs -all
+          
+      - name: Set Password for Runner Account
+        run: |
+          # The default user on these runners is 'runner'
+          sudo dscl . -passwd /Users/runner SecretPass123!
+          
+      - name: Output Connection Details
+        run: |
+          TAIL_IP=$(sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale ip -4)
+          echo "========================================"
+          echo "🚀 macOS VNC is LIVE! Connect via Tailscale."
+          echo "Open 'Screen Sharing' app on Mac or use a VNC viewer."
+          echo "Address: vnc://$TAIL_IP"
+          echo "User:    runner"
+          echo "Pass:    SecretPass123!"
+          echo "========================================"
+          
+      - name: Keep Alive Loop
+        run: |
+          # Keep the runner alive for a few hours
+          sleep 21600
+          
