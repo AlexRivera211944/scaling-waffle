@@ -1,0 +1,58 @@
+name: macOS-Tailscale-VNC ✨
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-13
+    steps:
+      - name: Connect to Tailscale 😈
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          
+      - name: Enable Screen Sharing (VNC)
+        run: |
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -restart -agent -privs -all
+          
+      - name: Set Password for Runner Account
+        run: |
+          sudo dscl . -passwd /Users/runner SecretPass123!
+          
+      - name: Get Connection Details & Send Telegram Ping 🚀
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          # The official action puts the CLI right in our path
+          TAIL_IP=$(sudo tailscale ip -4)
+          
+          echo "========================================"
+          echo "🚀 macOS VNC is LIVE!"
+          echo "Address: vnc://$TAIL_IP"
+          echo "User:    runner"
+          echo "Pass:    SecretPass123!"
+          echo "========================================"
+          
+          # Quick Python script to ping the credentials straight to your Telegram bot
+          python3 -c "
+          import urllib.request, urllib.parse, os
+          
+          token = os.environ.get('TELEGRAM_BOT_TOKEN')
+          chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+          ip = '$TAIL_IP'
+          
+          if token and chat_id:
+              text = f'🔥 macOS Runner is LIVE!\n\n🌐 Address: vnc://{ip}\n👤 User: runner\n🔑 Pass: SecretPass123!'
+              url = f'https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={urllib.parse.quote(text)}'
+              try:
+                  urllib.request.urlopen(url)
+                  print('Pinged Telegram successfully!')
+              except Exception as e:
+                  print('Failed to ping Telegram:', e)
+          "
+          
+      - name: Keep Alive Loop
+        run: sleep 21600
